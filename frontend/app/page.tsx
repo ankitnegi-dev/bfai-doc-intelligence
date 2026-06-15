@@ -1,14 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
 import { Brain, FileText, Search, Layers, ArrowRight, Sparkles, Database, Zap, Shield } from 'lucide-react'
-
-// Preserves the platform's auth query params (cat token etc.) on navigation
-function useNavHref(path: string): string {
-  const params = useSearchParams()
-  const qs = params.toString()
-  return qs ? `${path}?${qs}` : path
-}
 
 const FEATURES = [
   {
@@ -17,7 +9,7 @@ const FEATURES = [
     bg: 'bg-blue-50 dark:bg-blue-900/20',
     border: 'border-blue-100 dark:border-blue-800',
     title: 'Intelligent Parsing',
-    desc: 'Digital PDFs, scanned docs (OCR), and text files - tables extracted to markdown automatically.',
+    desc: 'Digital PDFs, scanned docs (OCR), and text files — tables extracted to markdown automatically.',
   },
   {
     icon: Brain,
@@ -25,7 +17,7 @@ const FEATURES = [
     bg: 'bg-purple-50 dark:bg-purple-900/20',
     border: 'border-purple-100 dark:border-purple-800',
     title: 'Auto Classification',
-    desc: 'Claude Haiku classifies every document - type, domain, sensitivity, entities, and a one-line summary.',
+    desc: 'Claude Haiku classifies every document — type, domain, sensitivity, entities, and a one-line summary.',
   },
   {
     icon: Search,
@@ -38,7 +30,7 @@ const FEATURES = [
 ]
 
 const STEPS = [
-  { step: '01', icon: FileText, label: 'Upload', desc: 'Drop PDFs or text files - up to 20 MB each' },
+  { step: '01', icon: FileText, label: 'Upload', desc: 'Drop PDFs or text files — up to 20 MB each' },
   { step: '02', icon: Layers, label: 'Index', desc: 'Parsed, classified, embedded & stored in ChromaDB' },
   { step: '03', icon: Brain, label: 'Ask', desc: 'Natural-language Q&A with streamed, cited answers' },
 ]
@@ -57,8 +49,8 @@ const BADGES = [
 ]
 
 export default function HomePage() {
-  const chatHref   = useNavHref('/chat')
-  const uploadHref = useNavHref('/upload')
+  const chatHref   = '/chat'
+  const uploadHref = '/upload'
 
   return (
     <div className="min-h-screen bg-slate-950 overflow-hidden">
@@ -90,7 +82,7 @@ export default function HomePage() {
 
           <p className="text-slate-400 text-lg sm:text-xl max-w-2xl mx-auto leading-relaxed mb-10 animate-slide-up animation-delay-200">
             Upload PDFs and text files. Ask questions in plain English.
-            Get streamed answers with exact page citations - grounded, never hallucinated.
+            Get streamed answers with exact page citations — grounded, never hallucinated.
           </p>
 
           {/* CTA buttons */}
@@ -186,7 +178,7 @@ export default function HomePage() {
         <section className="pb-20 text-center">
           <div className="bg-gradient-to-r from-blue-900/40 to-purple-900/40 border border-white/10 rounded-3xl p-10">
             <h2 className="text-2xl font-bold text-white mb-3">Ready to explore your documents?</h2>
-            <p className="text-slate-400 mb-6 text-sm">6 sample documents are already indexed - no upload needed to try it out.</p>
+            <p className="text-slate-400 mb-6 text-sm">6 sample documents are already indexed — no upload needed to try it out.</p>
             <Link
               href={chatHref}
               className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-8 py-3 rounded-2xl shadow-lg shadow-blue-900/40 transition-all duration-200 hover:-translate-y-0.5"

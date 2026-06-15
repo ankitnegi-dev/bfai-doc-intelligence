@@ -1,7 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { FileText, Trash2, ChevronLeft, ChevronRight, RefreshCw, AlertCircle, Eye, RotateCcw } from 'lucide-react'
-import { useSearchParams } from 'next/navigation'
 import { getDocuments, deleteDocument, DocumentMetadata, API_URL } from '@/lib/api'
 import DocPreviewModal from './DocPreviewModal'
 
@@ -48,10 +47,6 @@ export default function DocumentsSidebar({ isOpen, onToggle }: Props) {
   const [previewDoc, setPreviewDoc] = useState<DocumentMetadata | null>(null)
   const [error, setError]         = useState<string | null>(null)
 
-  const params = useSearchParams()
-  const qs     = params.toString()
-  const withQs = (path: string) => qs ? `${path}?${qs}` : path
-
   const fetchDocs = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -73,7 +68,7 @@ export default function DocumentsSidebar({ isOpen, onToggle }: Props) {
       await deleteDocument(docId)
       setDocs(prev => prev.filter(d => d.doc_id !== docId))
     } catch {
-      setError('Delete failed - please try again')
+      setError('Delete failed — please try again')
     } finally {
       setDeletingId(null)
     }
@@ -229,7 +224,7 @@ export default function DocumentsSidebar({ isOpen, onToggle }: Props) {
         {/* Footer */}
         <div className="px-4 py-2.5 border-t border-slate-200 dark:border-slate-700">
           <a
-            href={withQs('/upload')}
+            href="/upload"
             className="flex items-center justify-center gap-1.5 w-full text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors py-1"
           >
             + Upload new document

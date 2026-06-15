@@ -1,6 +1,5 @@
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useSearchParams } from 'next/navigation'
 import { Search, FileText, Clock, X, ArrowRight } from 'lucide-react'
 import { getDocuments, DocumentMetadata } from '@/lib/api'
 import { loadQueryHistory } from '@/lib/storage'
@@ -15,9 +14,6 @@ export default function CmdKSearch({ onSelectQuery }: Props) {
   const [docs, setDocs]         = useState<DocumentMetadata[]>([])
   const [history, setHistory]   = useState<string[]>([])
   const inputRef                = useRef<HTMLInputElement>(null)
-  const params                  = useSearchParams()
-  const qs                      = params.toString()
-
   // Open on Cmd+K / Ctrl+K
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -54,9 +50,8 @@ export default function CmdKSearch({ onSelectQuery }: Props) {
   }, [onSelectQuery])
 
   const handleNavigate = useCallback((path: string) => {
-    const href = qs ? `${path}?${qs}` : path
-    window.location.href = href
-  }, [qs])
+    window.location.href = path
+  }, [])
 
   if (!open) return null
 

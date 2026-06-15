@@ -1,16 +1,13 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { getDocuments } from '@/lib/api'
 import { FileText, Upload, Brain, Database, Sun, Moon } from 'lucide-react'
 import { useTheme } from './ThemeProvider'
 
 export default function Navbar() {
   const pathname  = usePathname()
-  const params    = useSearchParams()
-  const qs        = params.toString()
-  const withQs    = (path: string) => qs ? `${path}?${qs}` : path
   const [docCount, setDocCount] = useState<number>(0)
   const { theme, toggle } = useTheme()
 
@@ -20,7 +17,7 @@ export default function Navbar() {
         const data = await getDocuments()
         setDocCount(data.total)
       } catch {
-        // Ignore errors - backend may not be ready
+        // Ignore errors — backend may not be ready
       }
     }
     fetchCount()
@@ -38,7 +35,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
-          <Link href={withQs('/chat')} className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+          <Link href={'/chat'} className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-100 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
             <FileText className="w-5 h-5 text-blue-500" />
             <span>DocIntel</span>
             <span className="hidden sm:block text-xs font-normal text-slate-400 dark:text-slate-500 ml-1">
@@ -53,7 +50,7 @@ export default function Navbar() {
               return (
                 <Link
                   key={href}
-                  href={withQs(href)}
+                  href={href}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                     isActive
                       ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
