@@ -1,0 +1,198 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #f8fafc;
+    --foreground: #0f172a;
+  }
+  .dark {
+    --background: #0f172a;
+    --foreground: #f1f5f9;
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+}
+
+@layer components {
+  /* ── Typing dots ── */
+  .typing-dot {
+    @apply w-2 h-2 bg-blue-400 rounded-full inline-block mx-0.5;
+    animation: typing 1.4s infinite ease-in-out;
+  }
+  .typing-dot:nth-child(1) { animation-delay: 0s; }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+  /* ── Markdown prose — light ── */
+  .md-body h1 { @apply text-xl font-bold text-slate-900 mb-2 mt-3; }
+  .md-body h2 { @apply text-base font-semibold text-slate-800 mb-2 mt-3 border-b border-slate-200 pb-1; }
+  .md-body h3 { @apply text-sm font-semibold text-slate-800 mb-1 mt-2; }
+  .md-body p  { @apply text-sm leading-relaxed text-slate-800 mb-2; }
+  .md-body ul { @apply list-disc list-outside pl-5 mb-2 space-y-0.5; }
+  .md-body ol { @apply list-decimal list-outside pl-5 mb-2 space-y-0.5; }
+  .md-body li { @apply text-sm leading-relaxed text-slate-800; }
+  .md-body strong { @apply font-semibold text-slate-900; }
+  .md-body em    { @apply italic; }
+  .md-body code  { @apply bg-slate-100 text-slate-700 px-1 py-0.5 rounded text-xs font-mono; }
+  .md-body pre   { @apply bg-slate-100 rounded-lg p-3 overflow-x-auto mb-2; }
+  .md-body pre code { @apply bg-transparent p-0; }
+  .md-body blockquote { @apply border-l-4 border-blue-300 pl-3 italic text-slate-600 mb-2; }
+  .md-body table { @apply w-full text-sm border-collapse mb-2; }
+  .md-body th { @apply bg-slate-100 text-slate-700 font-semibold px-3 py-1.5 border border-slate-200 text-left; }
+  .md-body td { @apply px-3 py-1.5 border border-slate-200 text-slate-800; }
+  .md-body tr:nth-child(even) td { @apply bg-slate-50; }
+
+  /* ── Markdown prose — dark ── */
+  .dark .md-body h1 { @apply text-slate-100; }
+  .dark .md-body h2 { @apply text-slate-200 border-slate-600; }
+  .dark .md-body h3 { @apply text-slate-200; }
+  .dark .md-body p  { @apply text-slate-300; }
+  .dark .md-body li { @apply text-slate-300; }
+  .dark .md-body strong { @apply text-slate-100; }
+  .dark .md-body code  { @apply bg-slate-700 text-slate-200; }
+  .dark .md-body pre   { @apply bg-slate-700; }
+  .dark .md-body blockquote { @apply border-blue-400 text-slate-400; }
+  .dark .md-body th { @apply bg-slate-700 text-slate-200 border-slate-600; }
+  .dark .md-body td { @apply border-slate-600 text-slate-300; }
+  .dark .md-body tr:nth-child(even) td { @apply bg-slate-800; }
+
+  /* ── Message entrance ── */
+  .animate-message-in {
+    animation: message-in 0.25s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  }
+
+  /* ── Fade in ── */
+  .animate-fade-in {
+    animation: fade-in 0.5s ease both;
+  }
+
+  /* ── Slide up ── */
+  .animate-slide-up {
+    animation: slide-up 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  }
+
+  /* ── Card entrance ── */
+  .animate-card-in {
+    animation: card-in 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  }
+
+  /* ── Animation delays ── */
+  .animation-delay-200  { animation-delay: 0.2s; }
+  .animation-delay-300  { animation-delay: 0.3s; }
+  .animation-delay-500  { animation-delay: 0.5s; }
+  .animation-delay-2000 { animation-delay: 2s; }
+  .animation-delay-4000 { animation-delay: 4s; }
+
+  /* ── Animated background blobs ── */
+  .animate-blob {
+    animation: blob 7s infinite ease-in-out;
+  }
+
+  /* ── Shimmer (loading skeleton) ── */
+  .shimmer {
+    background: linear-gradient(90deg, transparent 25%, rgba(255,255,255,0.08) 50%, transparent 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* ── Progress stripe (active upload) ── */
+  .progress-stripe {
+    background-image: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 8px,
+      rgba(255,255,255,0.15) 8px,
+      rgba(255,255,255,0.15) 16px
+    );
+    animation: stripe-move 0.8s linear infinite;
+  }
+
+  /* ── Citation marker ── */
+  .citation-marker {
+    @apply bg-blue-100 text-blue-700 px-1 py-0.5 rounded text-xs font-medium cursor-pointer hover:bg-blue-200 transition-colors;
+  }
+  .dark .citation-marker {
+    @apply bg-blue-900 text-blue-300 hover:bg-blue-800;
+  }
+
+  /* ── Streaming cursor blink ── */
+  .stream-cursor::after {
+    content: '▋';
+    @apply text-blue-500 ml-0.5;
+    animation: blink 0.8s ease-in-out infinite;
+  }
+}
+
+/* ── Keyframes ── */
+
+@keyframes typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-6px); opacity: 1; }
+}
+
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+@keyframes blob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(30px, -20px) scale(1.05); }
+  66%       { transform: translate(-20px, 15px) scale(0.95); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+@keyframes stripe-move {
+  0%   { background-position: 0 0; }
+  100% { background-position: 32px 0; }
+}
+
+@keyframes pulse-mic {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+}
+
+@keyframes spin-ring {
+  to { transform: rotate(360deg); }
+}
+
+.mic-active {
+  animation: pulse-mic 1.5s ease-in-out infinite;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #64748b; }
+.dark ::-webkit-scrollbar-track { background: #1e293b; }
+.dark ::-webkit-scrollbar-thumb { background: #475569; }
