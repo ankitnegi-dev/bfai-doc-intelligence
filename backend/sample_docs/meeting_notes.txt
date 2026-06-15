@@ -1,0 +1,76 @@
+MEETING NOTES - Product Strategy Q4 2024
+=========================================
+Date: October 10, 2024
+Time: 10:00 AM - 12:00 PM PST
+Location: Conference Room B / Zoom Hybrid
+Facilitator: Sarah Johnson (VP Product)
+
+ATTENDEES
+---------
+- Sarah Johnson (VP Product)
+- Marcus Chen (CTO)
+- Lisa Patel (Head of Engineering)
+- David Kim (Sales Director)
+- Emma Torres (Customer Success Lead)
+- Raj Gupta (Data Science Lead)
+- Anita Williams (UX Lead)
+
+AGENDA ITEMS & DISCUSSION
+--------------------------
+
+1. Q3 2024 Retrospective
+   - Platform uptime: 99.94% (above 99.9% SLA target)
+   - Monthly Active Users: 42,300 (up 18% QoQ)
+   - NPS score improved from 34 to 47
+   - 3 enterprise churn incidents (root cause: onboarding friction)
+   - RESOLVED: Dedicated CSM assigned to enterprise accounts >$50K ARR
+
+2. Q4 2024 Roadmap Priorities (Voted)
+   a) AI Document Parser v2.0 [PRIORITY 1 - P0]
+      - OCR for scanned docs (EasyOCR integration)
+      - Table structure extraction
+      - Multi-language support (Spanish, French, German)
+      - Target: GA release December 15, 2024
+   b) Advanced Search & Filtering [P1]
+      - Semantic search across documents
+      - Date range, document type, author filters
+      - Target: Beta November 30, 2024
+   c) API Rate Limiting Dashboard [P2]
+      - Real-time usage visualization
+      - Configurable alerts at 80%/100% thresholds
+      - Target: December 1, 2024
+   d) Mobile Responsive Redesign [P2]
+      - iOS and Android browser optimization
+      - Target: December 20, 2024
+
+3. Enterprise Customer Feedback (Emma Torres)
+   - Top request: Bulk document upload with progress tracking
+   - Second request: PDF annotation / highlight export
+   - Third request: SSO via SAML 2.0
+   - 8/12 enterprise customers cited "upload experience" as friction point
+   - ACTION: Schedule 5 customer interviews before sprint planning
+
+4. Infrastructure Scaling (Lisa Patel)
+   - Current: 8 x c5.2xlarge EC2 instances (auto-scaling group)
+   - Q4 target: Upgrade to 12 x c5.4xlarge ahead of holiday traffic
+   - ChromaDB vector store migration from single-node to distributed cluster
+   - Estimated cost increase: $12,400/month (+22%)
+   - Budget approved by CFO on October 8, 2024
+
+5. Sales Pipeline Update (David Kim)
+   - Q4 pipeline: $3.2M qualified opportunities
+   - 4 deals >$200K in final negotiation
+   - MegaBank Corp: $450K/yr deal, decision by October 31
+   - GlobalRetail Inc: $280K/yr, pilot running through November 15
+   - Win rate YTD: 34% (target 40%)
+
+ACTION ITEMS
+------------
+1. [Lisa Patel] Submit infrastructure upgrade request to DevOps by Oct 14
+2. [Raj Gupta]  Complete EasyOCR benchmark tests by Oct 18
+3. [Anita Williams] Deliver bulk upload UX mockups by Oct 17
+4. [Emma Torres] Schedule 5 enterprise customer interviews by Oct 20
+5. [Sarah Johnson] Update roadmap in Jira and send to stakeholders by Oct 11
+6. [Marcus Chen] Architecture review for distributed ChromaDB by Oct 25
+
+NEXT MEETING: October 24, 2024, 10:00 AM PST - Sprint Planning
