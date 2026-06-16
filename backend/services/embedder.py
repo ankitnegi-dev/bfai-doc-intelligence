@@ -1,51 +1,35 @@
 """
 Embedder Service
 ----------------
-Generates vector embeddings using sentence-transformers.
-Uses the lightweight all-MiniLM-L6-v2 model (80MB).
+Uses ChromaDB's built-in ONNXRuntime embedding function.
+No torch required — stays within Render free tier memory limits.
 """
 import logging
-from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
-# Lazy global model instance
-_model = None
+_ef = None
 
-
-def _get_model():
-    """Lazy-load the sentence transformer model."""
-    global _model
-    if _model is None:
-        from sentence_transformers import SentenceTransformer
-        logger.info("Loading sentence-transformers model (all-MiniLM-L6-v2)...")
-        _model = SentenceTransformer("all-MiniLM-L6-v2")
-        logger.info("Model loaded successfully")
-    return _model
-
+def _get_ef():
+    global _ef
+    if _ef is None:
+        from chromadb.utils.embedding_functions import ONNXMiniLM_L6_V2
+        logger.info("Loading ONNX embedding function...")
+        _ef = ONNXMiniLM_L6_V2()
+        logger.info("ONNX embedding function ready")
+    return _ef
 
 def embed_chunks(chunks: list[str]) -> list[list[float]]:
-    """
-    Generate embeddings for a list of text chunks.
-    Returns a list of embedding vectors.
-    """
     if not chunks:
         return []
     try:
-        model = _get_model()
-        embeddings = model.encode(
-            chunks,
-            batch_size=32,
-            show_progress_bar=False,
-            normalize_embeddings=True
-        )
-        return embeddings.tolist()
+        ef = _get_ef()
+        embeddings = ef(chunks)
+        return [list(e) for e in embeddings]
     except Exception as e:
         logger.error(f"Embedding failed: {e}")
         raise
 
-
 def embed_query(query: str) -> list[float]:
-    """Embed a single query string."""
     results = embed_chunks([query])
     return results[0] if results else []
