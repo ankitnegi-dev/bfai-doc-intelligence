@@ -9,9 +9,7 @@ python-dotenv==1.0.1
 # Document parsing
 PyMuPDF==1.24.4
 pdfplumber==0.11.1
-pytesseract==0.3.10
 Pillow==10.3.0
-pdf2image==1.17.0
 
 # LLM + Embeddings
 groq
@@ -24,4 +22,4 @@ chromadb==0.5.3
 slowapi==0.1.9
 
 # Sample doc generation
-reportlab==4.2.0git add backend/requirements.txt
+reportlab==4.2.0
