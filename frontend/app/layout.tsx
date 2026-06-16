@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import Navbar from '@/components/Navbar'
 import ThemeProvider from '@/components/ThemeProvider'
+import WakeupPing from '@/components/WakeupPing'   
 
 export const metadata: Metadata = {
   title: 'DocIntel - Document Intelligence + Agentic RAG',
@@ -17,6 +18,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
         <ThemeProvider>
+          <WakeupPing />    {/* ← add this */}
           <Navbar />
           <main className="pt-14">
             {children}

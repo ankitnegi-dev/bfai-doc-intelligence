@@ -5,9 +5,9 @@ import axios, { AxiosProgressEvent } from 'axios'
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-const api = axios.create({
-  baseURL: API_URL,
-  timeout: 120000, // 2 min for large docs
+const api = axios.create({ 
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  timeout: 300000  // 5 minutes instead of 2
 })
 
 // ─── Types ──────────────────────────────────────────────────────────────────
