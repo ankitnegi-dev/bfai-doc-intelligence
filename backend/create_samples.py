@@ -1,5 +1,10 @@
 """Generate sample documents for BFAI Doc Intelligence demo."""
+import hashlib
+import json
 import os
+from datetime import datetime
+from pathlib import Path
+
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
@@ -7,8 +12,19 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
+from models.document import DocumentMetadata
+from services.classifier import classify_document
+from services.parser import parse_document
+from services.vector_store import index_document
+
 OUT = os.path.join(os.path.dirname(__file__), "sample_docs")
 os.makedirs(OUT, exist_ok=True)
+
+STORAGE_DIR = Path(__file__).parent / "storage"
+UPLOADS_DIR = STORAGE_DIR / "uploads"
+METADATA_DIR = STORAGE_DIR / "metadata"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+METADATA_DIR.mkdir(parents=True, exist_ok=True)
 
 styles = getSampleStyleSheet()
 
@@ -471,6 +487,58 @@ NEXT MEETING: October 24, 2024, 10:00 AM PST - Sprint Planning
     print(f"Created: {path}")
 
 
+def index_sample_file(file_path: Path) -> bool:
+    """Parse, classify, index, and persist metadata for one generated sample file."""
+    if not file_path.exists():
+        return False
+
+    content = file_path.read_bytes()
+    doc_id = hashlib.sha256(content).hexdigest()
+    meta_path = METADATA_DIR / f"{doc_id}.json"
+    uploaded_path = UPLOADS_DIR / f"{doc_id}{file_path.suffix.lower()}"
+
+    if meta_path.exists():
+        try:
+            existing = json.loads(meta_path.read_text())
+            if existing.get("status") == "indexed":
+                print(f"Indexed: {file_path.name} (already present)")
+                return True
+        except Exception:
+            pass
+
+    uploaded_path.write_bytes(content)
+    os.chmod(uploaded_path, 0o600)
+
+    pages = parse_document(str(uploaded_path), doc_id)
+    if not pages:
+        raise ValueError(f"No content extracted from {file_path.name}")
+
+    classification = classify_document(pages)
+    chunk_count = index_document(doc_id, file_path.name, pages)
+
+    metadata = DocumentMetadata(
+        doc_id=doc_id,
+        original_filename=file_path.name,
+        upload_time=datetime.utcnow().isoformat(),
+        page_count=len(pages),
+        file_size=uploaded_path.stat().st_size,
+        classification=classification,
+        status="indexed",
+    )
+    meta_path.write_text(json.dumps(metadata.model_dump(), indent=2))
+    print(f"Indexed: {file_path.name} ({chunk_count} chunks)")
+    return True
+
+
+def index_generated_samples() -> None:
+    """Index all generated sample files so they appear in the documents list."""
+    sample_files = sorted(Path(OUT).glob("*"), key=lambda p: p.name)
+
+    for file_path in sample_files:
+        if file_path.is_file():
+            index_sample_file(file_path)
+
+
 if __name__ == "__main__":
     print("Generating sample documents...")
     create_invoice()
@@ -479,6 +547,10 @@ if __name__ == "__main__":
     create_medical_record()
     create_contract()
     create_meeting_notes()
+
+    print("\nIndexing sample documents...")
+    index_generated_samples()
+
     print(f"\nDone! Files in: {OUT}")
     import os
     for f in os.listdir(OUT):
