@@ -1,0 +1,6 @@
+storage/
+__pycache__/
+*.pyc
+.env
+test_chroma_cloud.py
+venv/
