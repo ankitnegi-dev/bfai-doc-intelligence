@@ -6,12 +6,10 @@ GET  /status/{doc_id} - Get processing status for a document
 POST /bulk-upload - Upload multiple documents
 """
 import os
-import json
 import hashlib
 import logging
 import asyncio
 from pathlib import Path
-from datetime import datetime
 from typing import Optional
 
 try:
@@ -23,17 +21,16 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks,
 from fastapi.responses import JSONResponse
 
 from limiter import limiter
-from models.document import DocumentMetadata, DocumentResponse, ProcessingStatus
+from models.document import DocumentResponse, ProcessingStatus
+from services.document_repo import get_document, upsert_document, list_documents
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 STORAGE_DIR = Path(__file__).parent.parent / "storage"
 UPLOADS_DIR = STORAGE_DIR / "uploads"
-METADATA_DIR = STORAGE_DIR / "metadata"
 
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
-METADATA_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
 
 # Security: allowed file types (extension + MIME)
 ALLOWED_EXTENSIONS = {".pdf", ".txt", ".png", ".jpg", ".jpeg"}
@@ -121,7 +118,7 @@ def _validate_file(file: UploadFile, content: bytes) -> None:
 
 async def _process_document(doc_id: str, file_path: Path, original_filename: str):
     """
-    Background task: parse → classify → index a document.
+    Background task: parse -> classify -> index a document.
     Updates processing status throughout.
     """
     from services.parser import parse_document
@@ -150,39 +147,48 @@ async def _process_document(doc_id: str, file_path: Path, original_filename: str
             None, index_document, doc_id, original_filename, pages
         )
 
-        # --- SAVE METADATA ---
-        metadata = DocumentMetadata(
-            doc_id=doc_id,
-            original_filename=original_filename,
-            upload_time=datetime.utcnow().isoformat(),
-            page_count=len(pages),
-            file_size=file_path.stat().st_size,
-            classification=classification,
-            status="indexed"
-        )
-        meta_path = METADATA_DIR / f"{doc_id}.json"
-        meta_path.write_text(json.dumps(metadata.model_dump(), indent=2))
+        final_status = "indexed" if chunk_count > 0 else "error"
+        error_msg = None if chunk_count > 0 else "No extractable text found (scanned PDF without OCR support)"
 
-        _update_status(doc_id, "indexed", 100, f"Indexed {chunk_count} chunks")
-        logger.info(f"Successfully indexed: {original_filename} ({doc_id})")
+        # --- SAVE METADATA (Postgres) ---
+        upsert_document(
+            doc_id=doc_id,
+            filename=original_filename,
+            file_ext=Path(original_filename).suffix.lower(),
+            file_size=file_path.stat().st_size,
+            status=final_status,
+            page_count=len(pages),
+            classification=classification,
+            chunk_count=chunk_count,
+            error_message=error_msg,
+        )
+        _update_status(
+            doc_id,
+            final_status,
+            100 if chunk_count > 0 else 0,
+            f"Indexed {chunk_count} chunks" if chunk_count > 0 else error_msg,
+            error_msg,
+        )
+
+        if chunk_count > 0:
+            logger.info(f"Successfully indexed: {original_filename} ({doc_id})")
+        else:
+            logger.warning(f"Indexed with 0 chunks: {original_filename} ({doc_id})")
 
     except Exception as e:
         logger.error(f"Processing failed for {doc_id}: {e}")
         _update_status(doc_id, "error", 0, "", str(e))
 
-        # Save error metadata
+        # Save error metadata (Postgres)
         try:
-            metadata = DocumentMetadata(
+            upsert_document(
                 doc_id=doc_id,
-                original_filename=original_filename,
-                upload_time=datetime.utcnow().isoformat(),
-                page_count=0,
+                filename=original_filename,
+                file_ext=Path(original_filename).suffix.lower(),
                 file_size=file_path.stat().st_size if file_path.exists() else 0,
                 status="error",
-                error_message=str(e)
+                error_message=str(e),
             )
-            meta_path = METADATA_DIR / f"{doc_id}.json"
-            meta_path.write_text(json.dumps(metadata.model_dump(), indent=2))
         except Exception:
             pass
 
@@ -210,21 +216,16 @@ async def upload_document(
     file_path = UPLOADS_DIR / safe_filename
 
     # Deduplicate: if already indexed, return existing
-    meta_path = METADATA_DIR / f"{doc_hash}.json"
-    if meta_path.exists():
-        try:
-            existing = json.loads(meta_path.read_text())
-            if existing.get("status") == "indexed":
-                return {
-                    "doc_id": doc_hash,
-                    "filename": existing["original_filename"],
-                    "page_count": existing["page_count"],
-                    "classification": existing.get("classification", {}),
-                    "status": "indexed",
-                    "message": "Document already indexed"
-                }
-        except Exception:
-            pass
+    existing = get_document(doc_hash)
+    if existing and existing.get("status") == "indexed":
+        return {
+            "doc_id": doc_hash,
+            "filename": existing["original_filename"],
+            "page_count": existing["page_count"],
+            "classification": existing.get("classification", {}),
+            "status": "indexed",
+            "message": "Document already indexed"
+        }
 
     # Save file to disk (hashed filename - never original name)
     file_path.write_bytes(content)
@@ -261,20 +262,16 @@ async def get_status(doc_id: str):
     if doc_id in _processing_status:
         return _processing_status[doc_id]
 
-    # Check persisted metadata
-    meta_path = METADATA_DIR / f"{doc_id}.json"
-    if meta_path.exists():
-        try:
-            meta = json.loads(meta_path.read_text())
-            return ProcessingStatus(
-                doc_id=doc_id,
-                filename=meta.get("original_filename", "unknown"),
-                status=meta.get("status", "indexed"),
-                progress=100 if meta.get("status") == "indexed" else 0,
-                message=meta.get("error_message", "")
-            )
-        except Exception:
-            pass
+    # Check persisted metadata (Postgres)
+    meta = get_document(doc_id)
+    if meta:
+        return ProcessingStatus(
+            doc_id=doc_id,
+            filename=meta.get("original_filename", "unknown"),
+            status=meta.get("status", "indexed"),
+            progress=100 if meta.get("status") == "indexed" else 0,
+            message=meta.get("error_message", "") or ""
+        )
 
     raise HTTPException(status_code=404, detail="Document not found")
 

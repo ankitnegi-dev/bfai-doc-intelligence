@@ -2,12 +2,11 @@
 Documents Router
 ----------------
 GET /documents              - List all indexed documents
-GET /page-image             - Serve a rendered page PNG
-GET /documents/{id}         - Get metadata for one document
-DELETE /documents/{id}      - Remove a document
+GET /page-image              - Serve a rendered page PNG
+GET /documents/{id}          - Get metadata for one document
+DELETE /documents/{id}       - Remove a document
 POST /documents/{id}/reindex - Re-process and re-index a document
 """
-import json
 import logging
 import asyncio
 from pathlib import Path
@@ -15,37 +14,24 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from fastapi.responses import FileResponse
 
+from services.document_repo import get_document, list_documents, upsert_document
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 STORAGE_DIR = Path(__file__).parent.parent / "storage"
-METADATA_DIR = STORAGE_DIR / "metadata"
 PAGES_DIR = STORAGE_DIR / "pages"
 UPLOADS_DIR = STORAGE_DIR / "uploads"
 
 
-def _load_all_metadata() -> list[dict]:
-    """Load all document metadata from disk."""
-    docs = []
-    if not METADATA_DIR.exists():
-        return docs
-
-    for meta_file in METADATA_DIR.glob("*.json"):
-        try:
-            data = json.loads(meta_file.read_text())
-            docs.append(data)
-        except Exception as e:
-            logger.error(f"Failed to load metadata {meta_file}: {e}")
-
-    # Sort by upload_time desc
-    docs.sort(key=lambda d: d.get("upload_time", ""), reverse=True)
-    return docs
+def _valid_doc_id(doc_id: str) -> bool:
+    return len(doc_id) == 64 and all(c in "0123456789abcdef" for c in doc_id)
 
 
 @router.get("/documents")
-async def list_documents():
+async def get_all_documents():
     """Return all indexed documents with their metadata and classifications."""
-    docs = _load_all_metadata()
+    docs = list_documents()
     return {
         "documents": docs,
         "total": len([d for d in docs if d.get("status") == "indexed"])
@@ -53,20 +39,15 @@ async def list_documents():
 
 
 @router.get("/documents/{doc_id}")
-async def get_document(doc_id: str):
+async def get_one_document(doc_id: str):
     """Get metadata for a specific document."""
-    # Security: validate doc_id is a valid hex hash (no path traversal)
-    if not all(c in "0123456789abcdef" for c in doc_id) or len(doc_id) != 64:
+    if not _valid_doc_id(doc_id):
         raise HTTPException(status_code=400, detail="Invalid document ID")
 
-    meta_path = METADATA_DIR / f"{doc_id}.json"
-    if not meta_path.exists():
+    doc = get_document(doc_id)
+    if doc is None:
         raise HTTPException(status_code=404, detail="Document not found")
-
-    try:
-        return json.loads(meta_path.read_text())
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to load document metadata")
+    return doc
 
 
 @router.get("/page-image")
@@ -79,13 +60,11 @@ async def get_page_image(
     Images are ONLY served through this endpoint - never from direct disk path.
     Validates doc_id to prevent path traversal.
     """
-    # Security: validate doc_id format (hex only)
-    if not all(c in "0123456789abcdef" for c in doc_id) or len(doc_id) != 64:
+    if not _valid_doc_id(doc_id):
         raise HTTPException(status_code=400, detail="Invalid document ID")
 
     image_path = PAGES_DIR / f"{doc_id}_{page}.png"
 
-    # Verify the resolved path is inside PAGES_DIR (prevent traversal)
     try:
         resolved = image_path.resolve()
         if not str(resolved).startswith(str(PAGES_DIR.resolve())):
@@ -109,18 +88,24 @@ async def get_page_image(
 @router.delete("/documents/{doc_id}")
 async def delete_document(doc_id: str):
     """Remove a document and all its associated data."""
-    if not all(c in "0123456789abcdef" for c in doc_id) or len(doc_id) != 64:
+    if not _valid_doc_id(doc_id):
         raise HTTPException(status_code=400, detail="Invalid document ID")
 
     from services.vector_store import delete_document as vs_delete
+    from models.db import get_session, Document
 
     # Remove from vector store
     vs_delete(doc_id)
 
-    # Remove metadata
-    meta_path = METADATA_DIR / f"{doc_id}.json"
-    if meta_path.exists():
-        meta_path.unlink()
+    # Remove from Postgres
+    session = get_session()
+    try:
+        doc = session.get(Document, doc_id)
+        if doc:
+            session.delete(doc)
+            session.commit()
+    finally:
+        session.close()
 
     # Remove page images
     for img_file in PAGES_DIR.glob(f"{doc_id}_*.png"):
@@ -138,24 +123,17 @@ async def reindex_document(doc_id: str, background_tasks: BackgroundTasks):
     """
     Re-process and re-index an existing document.
     Reads the original stored file, deletes old vectors, and runs the full
-    parse → classify → embed pipeline again in the background.
+    parse -> classify -> embed pipeline again in the background.
     """
-    if not all(c in "0123456789abcdef" for c in doc_id) or len(doc_id) != 64:
+    if not _valid_doc_id(doc_id):
         raise HTTPException(status_code=400, detail="Invalid document ID")
 
-    # Load existing metadata to get original filename and file extension
-    meta_path = METADATA_DIR / f"{doc_id}.json"
-    if not meta_path.exists():
+    meta = get_document(doc_id)
+    if meta is None:
         raise HTTPException(status_code=404, detail="Document not found")
-
-    try:
-        meta = json.loads(meta_path.read_text())
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to read document metadata")
 
     original_filename = meta.get("original_filename", "unknown")
 
-    # Find the stored file
     file_path = None
     for ext in [".pdf", ".txt", ".png", ".jpg", ".jpeg"]:
         candidate = UPLOADS_DIR / f"{doc_id}{ext}"
@@ -173,46 +151,50 @@ async def reindex_document(doc_id: str, background_tasks: BackgroundTasks):
         from services.parser import parse_document
         from services.classifier import classify_document
         from services.vector_store import index_document, delete_document as vs_delete
-        import json as _json
-        from datetime import datetime
-        from models.document import DocumentMetadata
 
         try:
-            # Delete old vectors
             vs_delete(doc_id)
 
-            # Parse
             pages = await asyncio.get_event_loop().run_in_executor(
                 None, parse_document, str(file_path), doc_id
             )
             if not pages:
                 raise ValueError("No content extracted")
 
-            # Classify
             classification = await asyncio.get_event_loop().run_in_executor(
                 None, classify_document, pages
             )
 
-            # Embed + store
             chunk_count = await asyncio.get_event_loop().run_in_executor(
                 None, index_document, doc_id, original_filename, pages
             )
 
-            # Update metadata
-            updated_meta = DocumentMetadata(
+            final_status = "indexed" if chunk_count > 0 else "error"
+            error_msg = None if chunk_count > 0 else "No extractable text found"
+
+            upsert_document(
                 doc_id=doc_id,
-                original_filename=original_filename,
-                upload_time=meta.get("upload_time", datetime.utcnow().isoformat()),
-                page_count=len(pages),
+                filename=original_filename,
+                file_ext=Path(original_filename).suffix.lower(),
                 file_size=file_path.stat().st_size,
+                status=final_status,
+                page_count=len(pages),
                 classification=classification,
-                status="indexed",
+                chunk_count=chunk_count,
+                error_message=error_msg,
             )
-            meta_path.write_text(_json.dumps(updated_meta.model_dump(), indent=2))
             logger.info(f"Reindex complete: {original_filename} ({chunk_count} chunks)")
 
         except Exception as e:
             logger.error(f"Reindex failed for {doc_id}: {e}")
+            upsert_document(
+                doc_id=doc_id,
+                filename=original_filename,
+                file_ext=Path(original_filename).suffix.lower(),
+                file_size=file_path.stat().st_size if file_path.exists() else 0,
+                status="error",
+                error_message=str(e),
+            )
 
     background_tasks.add_task(_do_reindex)
 
