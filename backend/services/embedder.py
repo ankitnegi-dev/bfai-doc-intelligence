@@ -25,7 +25,7 @@ def embed_chunks(chunks: list[str]) -> list[list[float]]:
     try:
         ef = _get_ef()
         embeddings = ef(chunks)
-        return [list(e) for e in embeddings]
+        return [[float(x) for x in e] for e in embeddings]
     except Exception as e:
         logger.error(f"Embedding failed: {e}")
         raise
