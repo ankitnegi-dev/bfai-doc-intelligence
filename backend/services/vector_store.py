@@ -5,6 +5,7 @@ Manages ChromaDB for document chunk storage and similarity search.
 Uses upsert() for idempotent indexing (safe to re-index).
 """
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -32,13 +33,27 @@ _collection = None
 
 
 def _get_collection():
-    """Get or create the ChromaDB collection."""
+    """Get or create the ChromaDB collection (Cloud if configured, else local)."""
     global _client, _collection
     if _collection is None:
-        _client = chromadb.PersistentClient(
-            path=str(CHROMA_PATH),
-            settings=Settings(anonymized_telemetry=False)
-        )
+        api_key  = os.getenv("CHROMA_API_KEY")
+        tenant   = os.getenv("CHROMA_TENANT")
+        database = os.getenv("CHROMA_DATABASE")
+
+        if api_key and tenant and database:
+            _client = chromadb.CloudClient(
+                api_key=api_key,
+                tenant=tenant,
+                database=database,
+            )
+            logger.info("Connected to Chroma Cloud")
+        else:
+            _client = chromadb.PersistentClient(
+                path=str(CHROMA_PATH),
+                settings=Settings(anonymized_telemetry=False)
+            )
+            logger.info("Using local ChromaDB")
+
         _collection = _client.get_or_create_collection(
             name="documents",
             metadata={"hnsw:space": "cosine"}
