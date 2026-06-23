@@ -264,10 +264,11 @@ def _hybrid_search(query: str, n_fetch: int) -> list[dict]:
 
 
 def _retrieve_and_rerank(query: str, comparison_mode: bool) -> list[dict]:
-    """Hybrid retrieve (vector + BM25 via RRF) then cross-encoder re-rank."""
     n_fetch = 12 if comparison_mode else 8
     chunks = _hybrid_search(query, n_fetch)
+    logger.info(f"Hybrid search returned {len(chunks)} chunks before threshold filter")
     relevant = [c for c in chunks if c.get("distance", 0) < RELEVANCE_THRESHOLD]
+    logger.info(f"After threshold filter ({RELEVANCE_THRESHOLD}): {len(relevant)} chunks remain")
     if not relevant:
         return []
     top_k = 6 if comparison_mode else 5

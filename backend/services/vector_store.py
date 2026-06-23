@@ -209,6 +209,7 @@ def search(query: str, n_results: int = 5) -> list[dict]:
                 "extraction_method": meta.get("extraction_method", ""),
             })
 
+        logger.info(f"Search '{query}' returned {len(chunks)} chunks, distances: {[c['distance'] for c in chunks]}")
         return chunks
 
     except Exception as e:
