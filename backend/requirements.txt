@@ -18,7 +18,7 @@ groq
 chromadb==0.5.3
 
 # Security / rate limiting
-slowapi==0.1.9
+slowapi==1.5.9
 
 # Sample doc generation
 reportlab==4.2.0
