@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 PAGES_DIR = Path(__file__).parent.parent / "storage" / "pages"
 
 # Relevance threshold — cosine distance (lower = more similar)
-RELEVANCE_THRESHOLD = 1.2
+RELEVANCE_THRESHOLD = 1.6
 
 # Groq models
 RAG_MODEL       = "llama-3.3-70b-versatile"   # Main Q&A — best quality
