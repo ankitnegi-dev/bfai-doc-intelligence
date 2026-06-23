@@ -19,6 +19,7 @@ print(f"DEBUG - Tenant from env: {repr(os.getenv('CHROMA_TENANT'))}")
 print(f"DEBUG - Database from env: {repr(os.getenv('CHROMA_DATABASE'))}")
 print(f"DEBUG - API Key length: {len(os.getenv('CHROMA_API_KEY', ''))}")
 
+from models.db import init_db
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -92,4 +93,6 @@ async def health():
 @app.on_event("startup")
 async def startup_event():
     logger.info("Application starting up...")
+    init_db()
+    logger.info("Database tables ready.")
     logger.info("Startup complete — ready to serve requests.")
