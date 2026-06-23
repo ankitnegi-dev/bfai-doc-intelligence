@@ -14,6 +14,11 @@ from dotenv import load_dotenv
 # Load environment variables FIRST
 load_dotenv()
 
+import os
+print(f"DEBUG - Tenant from env: {repr(os.getenv('CHROMA_TENANT'))}")
+print(f"DEBUG - Database from env: {repr(os.getenv('CHROMA_DATABASE'))}")
+print(f"DEBUG - API Key length: {len(os.getenv('CHROMA_API_KEY', ''))}")
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
