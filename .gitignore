@@ -40,3 +40,4 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+backend/test_chroma_cloud.py 
