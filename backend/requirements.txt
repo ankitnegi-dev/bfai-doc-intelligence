@@ -22,3 +22,6 @@ slowapi==0.1.9
 
 # Sample doc generation
 reportlab==4.2.0
+
+sqlalchemy==2.0.36
+psycopg2-binary==2.9.10
