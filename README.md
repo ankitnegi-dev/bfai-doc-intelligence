@@ -39,20 +39,11 @@ Suggested captures:
 3. Chat response showing inline citations
 4. Document preview modal with page navigation
 
-Recommended file paths (add images later):
+<img width="1918" height="902" alt="landing" src="https://github.com/user-attachments/assets/7eff8ecb-472e-4bb2-9259-6e45461016b3" />
 
-- `docs/screenshots/landing.png`
-- `docs/screenshots/upload-progress.png`
-- `docs/screenshots/chat-citations.png`
-- `docs/screenshots/doc-preview.png`
+<img width="1918" height="868" alt="upload-progress" src="https://github.com/user-attachments/assets/1b86337c-6b75-453f-8b90-298f83200dcd" />
 
-Example markdown once screenshots are added:
 
-```markdown
-![Landing](docs/screenshots/landing.png)
-![Upload Progress](docs/screenshots/upload-progress.png)
-![Chat Citations](docs/screenshots/chat-citations.png)
-![Document Preview](docs/screenshots/doc-preview.png)
 ```
 
 ## Architecture
