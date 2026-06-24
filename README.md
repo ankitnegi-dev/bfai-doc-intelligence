@@ -43,6 +43,9 @@ Suggested captures:
 
 <img width="1918" height="868" alt="upload-progress" src="https://github.com/user-attachments/assets/1b86337c-6b75-453f-8b90-298f83200dcd" />
 
+<img width="1918" height="665" alt="chat-citations" src="https://github.com/user-attachments/assets/707de54f-1750-4ab7-af8d-82d8c68b9212" />
+
+<img width="842" height="782" alt="doc-preview" src="https://github.com/user-attachments/assets/82cc02ea-af02-4a76-bbf1-1ebf5bc79443" />
 
 ```
 
