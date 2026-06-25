@@ -11,7 +11,7 @@
 ![Render](https://img.shields.io/badge/Backend-Render-46E3B7?logo=render&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Frontend-Vercel-000000?logo=vercel&logoColor=white)
 
-A full-stack, **deployed** app for document ingestion, parsing, classification, indexing, and grounded Q&A with citations — containerized for local development and running in production on Render, Vercel, and Chroma Cloud.
+A full-stack, **deployed** app for document ingestion, parsing, classification, indexing, and grounded Q&A with citations - containerized for local development and running in production on Render, Vercel, and Chroma Cloud.
 
 **Live demo:** https://doc-intel-mu.vercel.app
 
@@ -30,7 +30,7 @@ This repository gives you a complete pipeline:
 - FastAPI backend with clear route separation
 - Next.js 14 frontend with upload, chat, and document preview workflows
 - **Chroma Cloud** vector store (persistent, not tied to a single server's disk) plus BM25 keyword retrieval, fused via Reciprocal Rank Fusion
-- **Postgres-backed metadata** — document status, classification, and chunk counts persist independently of any single server instance
+- **Postgres-backed metadata** - document status, classification, and chunk counts persist independently of any single server instance
 - **Dockerized** backend + frontend with `docker-compose` for one-command local orchestration matching production architecture
 - Streaming (SSE) and non-streaming chat endpoints
 - Deployed end-to-end: FastAPI on Render, Next.js on Vercel, vectors on Chroma Cloud, metadata on Render Postgres
@@ -81,7 +81,7 @@ flowchart LR
 | Backend | Docker container (`localhost:8000`) | Render Web Service |
 | Metadata DB | Docker Postgres container | Render Managed Postgres |
 | Vector store | Chroma Cloud (shared with prod) | Chroma Cloud |
-| File storage | Local volume | Local disk on Render instance (ephemeral — see Roadmap) |
+| File storage | Local volume | Local disk on Render instance (ephemeral - see Roadmap) |
 
 ## Repository Layout
 
@@ -121,18 +121,18 @@ docker-compose.yml         Orchestrates backend + frontend + postgres locally
 - **Parsing:** PyMuPDF, pdfplumber (table extraction)
 - **Retrieval:** Chroma Cloud (ONNX MiniLM embeddings), BM25, cross-encoder re-ranking
 - **Metadata storage:** PostgreSQL (Render Managed Postgres in prod, Dockerized Postgres locally)
-- **LLM:** Groq (`groq` SDK) — llama-3.3-70b-versatile (RAG) + llama-3.1-8b-instant (classification)
+- **LLM:** Groq (`groq` SDK) - llama-3.3-70b-versatile (RAG) + llama-3.1-8b-instant (classification)
 - **Frontend:** Next.js 14, React 18, TypeScript, Tailwind CSS
 - **Infra:** Docker, docker-compose, Render, Vercel, Chroma Cloud
 
 ## Prerequisites
 
-- Docker Desktop (recommended path — see Quickstart below)
+- Docker Desktop (recommended path - see Quickstart below)
 - Or, for a non-Docker setup: Python 3.11+, Node.js 18+
 - Groq API key (free at https://console.groq.com)
-- Chroma Cloud account (free tier — https://trychroma.com)
+- Chroma Cloud account (free tier - https://trychroma.com)
 
-## Quickstart (Docker — recommended)
+## Quickstart (Docker - recommended)
 
 This is the fastest way to get the full stack running locally, identical to production architecture.
 
@@ -160,9 +160,9 @@ docker-compose up --build
 ```
 
 This starts three containers:
-- `docintel-postgres` — Postgres 16, healthcheck-gated
-- `docintel-backend` — FastAPI on `:8000`, waits for Postgres to be healthy, auto-creates tables on startup
-- `docintel-frontend` — Next.js on `:3000`
+- `docintel-postgres` - Postgres 16, healthcheck-gated
+- `docintel-backend` - FastAPI on `:8000`, waits for Postgres to be healthy, auto-creates tables on startup
+- `docintel-frontend` - Next.js on `:3000`
 
 Open:
 
@@ -182,7 +182,7 @@ pip install -r requirements.txt
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Without a `DATABASE_URL` set, the backend falls back to a local SQLite file (`local_fallback.db`) so it still runs — but production and Docker both use Postgres.
+Without a `DATABASE_URL` set, the backend falls back to a local SQLite file (`local_fallback.db`) so it still runs - but production and Docker both use Postgres.
 
 ### 2. Frontend
 
