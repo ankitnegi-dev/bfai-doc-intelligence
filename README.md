@@ -1,32 +1,39 @@
 # Document Intelligence + Agentic RAG
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=nextdotjs&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=111111)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
-![ChromaDB](https://img.shields.io/badge/Vector%20DB-ChromaDB-6E56CF)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![ChromaDB](https://img.shields.io/badge/Vector%20DB-Chroma%20Cloud-6E56CF)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![Render](https://img.shields.io/badge/Backend-Render-46E3B7?logo=render&logoColor=white)
+![Vercel](https://img.shields.io/badge/Frontend-Vercel-000000?logo=vercel&logoColor=white)
 
-A full-stack app for document ingestion, parsing, classification, indexing, and grounded Q&A with citations.
+A full-stack, **deployed** app for document ingestion, parsing, classification, indexing, and grounded Q&A with citations - containerized for local development and running in production on Render, Vercel, and Chroma Cloud.
+
+**Live demo:** https://doc-intel-mu.vercel.app
 
 ## Why this project
 
 This repository gives you a complete pipeline:
 
 - Upload PDFs, text files, and images
-- Extract and normalize content (including OCR fallback)
+- Extract and normalize content (PyMuPDF text + table extraction)
 - Classify documents with Groq (llama-3.1-8b-instant)
-- Index chunks for semantic + lexical retrieval
+- Index chunks for semantic (vector) + lexical (BM25) retrieval
 - Ask questions and get answers with inline citations and page previews
 
 ## Highlights
 
 - FastAPI backend with clear route separation
 - Next.js 14 frontend with upload, chat, and document preview workflows
-- ChromaDB vector store plus BM25 keyword retrieval
-- Streaming and non-streaming chat endpoints
-- Startup auto-indexing of sample docs for instant local demo
-- Practical Windows-first run guidance
+- **Chroma Cloud** vector store (persistent, not tied to a single server's disk) plus BM25 keyword retrieval, fused via Reciprocal Rank Fusion
+- **Postgres-backed metadata** - document status, classification, and chunk counts persist independently of any single server instance
+- **Dockerized** backend + frontend with `docker-compose` for one-command local orchestration matching production architecture
+- Streaming (SSE) and non-streaming chat endpoints
+- Deployed end-to-end: FastAPI on Render, Next.js on Vercel, vectors on Chroma Cloud, metadata on Render Postgres
 
 ## Demo and Screenshots
 
@@ -47,19 +54,18 @@ Suggested captures:
 
 <img width="842" height="782" alt="doc-preview" src="https://github.com/user-attachments/assets/82cc02ea-af02-4a76-bbf1-1ebf5bc79443" />
 
-```
-
 ## Architecture
 
 ```mermaid
 flowchart LR
-    A[Frontend Next.js] --> B[FastAPI Routers]
+    A[Frontend Next.js — Vercel] --> B[FastAPI Routers — Render]
     B --> C[Upload Pipeline]
-    C --> D[Parser]
-    C --> E[Classifier]
-    D --> F[Chunking + Embedding]
-    F --> G[ChromaDB]
+    C --> D[Parser — PyMuPDF]
+    C --> E[Classifier — Groq LLM]
+    D --> F[Chunking + ONNX Embeddings]
+    F --> G[Chroma Cloud]
     F --> H[BM25 Index]
+    C --> P[(Postgres — Render)]
     A --> I[Chat API]
     I --> J[RAG Agent]
     J --> G
@@ -67,128 +73,154 @@ flowchart LR
     J --> A
 ```
 
+**Deployment topology:**
+
+| Layer | Local Dev | Production |
+|---|---|---|
+| Frontend | Docker container (`localhost:3000`) | Vercel |
+| Backend | Docker container (`localhost:8000`) | Render Web Service |
+| Metadata DB | Docker Postgres container | Render Managed Postgres |
+| Vector store | Chroma Cloud (shared with prod) | Chroma Cloud |
+| File storage | Local volume | Local disk on Render instance (ephemeral - see Roadmap) |
+
 ## Repository Layout
 
 ```text
 backend/
   main.py                  FastAPI app entrypoint
+  Dockerfile               Backend container build
   limiter.py               Shared rate limiter
   requirements.txt         Python dependencies
-  models/                  Request and response models
+  models/
+    document.py            Request/response Pydantic models
+    db.py                   SQLAlchemy models + Postgres session/engine
   routers/                 upload, chat, documents endpoints
-  services/                parser, classifier, embedder, vector store, rag agent
-  sample_docs/             Auto-indexed samples
-  storage/                 Uploaded files, metadata, pages
+  services/
+    parser.py               PDF/text parsing (PyMuPDF)
+    classifier.py            LLM-based document classification
+    embedder.py              ONNX embedding function (Chroma's built-in MiniLM)
+    vector_store.py          Chroma Cloud client + hybrid search
+    document_repo.py         Postgres data-access layer (replaces old JSON metadata)
+    rag_agent.py             Retrieval orchestration + answer synthesis
+    bm25_index.py            In-memory BM25 keyword index
+    reranker.py              Cross-encoder re-ranking
+  sample_docs/             Sample documents for demoing
+  storage/                 Uploaded files, rendered page images (local disk)
 frontend/
+  Dockerfile               Frontend container build
   package.json             Next scripts and deps
   app/                     App Router pages
   components/              Reusable UI modules
   lib/                     API client and local storage helpers
+docker-compose.yml         Orchestrates backend + frontend + postgres locally
 ```
 
 ## Tech Stack
 
-- Backend: FastAPI, Uvicorn, Pydantic, SlowAPI
-- Parsing: PyMuPDF, pdfplumber, EasyOCR
-- Retrieval: sentence-transformers, ChromaDB, BM25
-- LLM: Groq (`groq` SDK) — llama-3.3-70b-versatile (RAG) + llama-3.1-8b-instant (classification)
-- Frontend: Next.js 14, React 18, TypeScript, Tailwind CSS
+- **Backend:** FastAPI, Uvicorn, Pydantic, SlowAPI, SQLAlchemy
+- **Parsing:** PyMuPDF, pdfplumber (table extraction)
+- **Retrieval:** Chroma Cloud (ONNX MiniLM embeddings), BM25, cross-encoder re-ranking
+- **Metadata storage:** PostgreSQL (Render Managed Postgres in prod, Dockerized Postgres locally)
+- **LLM:** Groq (`groq` SDK) - llama-3.3-70b-versatile (RAG) + llama-3.1-8b-instant (classification)
+- **Frontend:** Next.js 14, React 18, TypeScript, Tailwind CSS
+- **Infra:** Docker, docker-compose, Render, Vercel, Chroma Cloud
 
 ## Prerequisites
 
-- Python 3.10+
-- Node.js 18+
+- Docker Desktop (recommended path - see Quickstart below)
+- Or, for a non-Docker setup: Python 3.11+, Node.js 18+
 - Groq API key (free at https://console.groq.com)
+- Chroma Cloud account (free tier - https://trychroma.com)
 
-## Copy-Paste Quickstart
+## Quickstart (Docker - recommended)
 
-Run backend in one terminal:
+This is the fastest way to get the full stack running locally, identical to production architecture.
 
-```powershell
-cd backend
-python -m venv .venv
-powershell -ExecutionPolicy Bypass -File .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```bash
+git clone https://github.com/ankitnegi-dev/DocIntel.git
+cd DocIntel
 ```
 
-Run frontend in another terminal:
+Create `backend/.env`:
 
-```powershell
-cd frontend
-npm.cmd install
-npm.cmd run dev
+```env
+GROQ_API_KEY=your_groq_api_key_here
+CHROMA_API_KEY=your_chroma_cloud_api_key
+CHROMA_TENANT=your_chroma_tenant_id
+CHROMA_DATABASE=your_chroma_database_name
+ALLOWED_ORIGINS=http://localhost:3000
+STORAGE_DIR=storage
+SAMPLE_DOCS_DIR=sample_docs
 ```
+
+Then:
+
+```bash
+docker-compose up --build
+```
+
+This starts three containers:
+- `docintel-postgres` - Postgres 16, healthcheck-gated
+- `docintel-backend` - FastAPI on `:8000`, waits for Postgres to be healthy, auto-creates tables on startup
+- `docintel-frontend` - Next.js on `:3000`
 
 Open:
 
 - Frontend: http://localhost:3000
 - Backend docs: http://localhost:8000/docs
+- Backend health: http://localhost:8000/health
 
-## Quick Start
+## Quickstart (without Docker)
 
 ### 1. Backend
 
 ```bash
 cd backend
 python -m venv .venv
-powershell -ExecutionPolicy Bypass -File .venv\Scripts\Activate.ps1
+powershell -ExecutionPolicy Bypass -File .venv\Scripts\Activate.ps1   # Windows
 pip install -r requirements.txt
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Command Prompt activation alternative:
-
-```bat
-.venv\Scripts\activate.bat
-```
+Without a `DATABASE_URL` set, the backend falls back to a local SQLite file (`local_fallback.db`) so it still runs - but production and Docker both use Postgres.
 
 ### 2. Frontend
 
-If PowerShell blocks `npm.ps1`, use `npm.cmd` or `cmd.exe`:
-
-```powershell
-cd frontend
-npm.cmd install
-npm.cmd run dev
-```
-
-Alternative:
-
 ```bash
 cd frontend
-C:\Windows\System32\cmd.exe /c "npm install"
-C:\Windows\System32\cmd.exe /c "npm run dev"
+npm install
+npm run dev
 ```
 
-### 3. Open
-
-- Frontend: http://localhost:3000
-- Backend docs: http://localhost:8000/docs
-- Backend health: http://localhost:8000/health
+If PowerShell blocks `npm.ps1`, use `npm.cmd install` / `npm.cmd run dev` instead.
 
 ## First 5 Minutes Validation
 
-1. Start backend and frontend.
-2. Open chat page from the UI.
-3. Ask a question against sample documents.
-4. Confirm response contains inline citations like `[DocName, Page N]`.
-5. Open document preview and verify page image loads.
+1. Start the stack (`docker-compose up --build`, or both servers individually).
+2. Open the Upload page and upload one of `backend/sample_docs/*`.
+3. Confirm the Processing Queue shows: Upload -> Parse -> Classify -> Index -> Done.
+4. Open the Chat page and ask a question about the uploaded document.
+5. Confirm the response contains inline citations like `[DocName, Page N]` with a page thumbnail.
 
 ## Configuration
 
 ### Backend `.env`
 
-Create `backend/.env` with at least:
-
 ```env
 GROQ_API_KEY=your_groq_api_key_here
+CHROMA_API_KEY=your_chroma_cloud_api_key
+CHROMA_TENANT=your_chroma_tenant_id
+CHROMA_DATABASE=your_chroma_database_name
 ALLOWED_ORIGINS=http://localhost:3000
-FRONTEND_URL=http://localhost:3000
 MAX_FILE_SIZE_MB=20
+STORAGE_DIR=storage
+SAMPLE_DOCS_DIR=sample_docs
+# Optional - only needed outside Docker/Render where it's injected automatically:
+# DATABASE_URL=postgresql://user:password@host:5432/dbname
 ```
 
-Get a free Groq API key at https://console.groq.com → API Keys → Create API Key.
+Get a free Groq API key at https://console.groq.com -> API Keys -> Create API Key.
+Get free Chroma Cloud credentials at https://trychroma.com -- create a project, then generate an API key from the Settings page.
 
 ### Frontend `.env.local`
 
@@ -205,12 +237,12 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 | GET | `/status/{doc_id}` | Check processing status |
 | POST | `/chat` | Ask question and get full response |
 | POST | `/chat/stream` | Stream response with SSE |
-| GET | `/documents` | List indexed docs |
-| GET | `/documents/{doc_id}` | Get document metadata |
-| DELETE | `/documents/{doc_id}` | Delete document |
+| GET | `/documents` | List indexed docs (from Postgres) |
+| GET | `/documents/{doc_id}` | Get document metadata (from Postgres) |
+| DELETE | `/documents/{doc_id}` | Delete document (Postgres row + Chroma vectors + files) |
 | POST | `/documents/{doc_id}/reindex` | Re-index document |
 | GET | `/page-image` | Get rendered page image |
-| GET | `/health` | Service health and index count |
+| GET | `/health` | Service health and Chroma index count |
 
 ## Core Behavior
 
@@ -219,19 +251,26 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 - Uses SHA-256 content hashing for safe, deduplicated storage
 - Validates extension, Content-Type, and byte-level MIME when available
 - Scans PDFs for suspicious markers before processing
-- Falls back to OCR when a page lacks extractable text
+- Documents with zero extractable text (e.g. scanned PDFs without OCR support) are correctly marked `status: error` with a clear reason, rather than falsely reporting success
+
+### Metadata Persistence
+
+- All document metadata (filename, status, classification, chunk count, error messages) is stored in **Postgres**, not flat JSON files
+- A `services/document_repo.py` repository layer mediates all reads/writes -- routers never touch SQLAlchemy directly
+- Postgres tables are auto-created on startup via `init_db()` -- safe to call on every boot
 
 ### Retrieval and Answering
 
-- Semantic retrieval from ChromaDB
-- BM25 lexical retrieval complement
-- Reranking for final context quality
+- Semantic retrieval from **Chroma Cloud** (ONNX MiniLM embeddings -- no GPU/torch dependency, keeps the backend lightweight enough for free-tier hosting)
+- BM25 lexical retrieval complement, fused via Reciprocal Rank Fusion
+- Cross-encoder reranking for final context quality
 - Inline citation extraction and page linkage
+- Relevance threshold tuned empirically against Chroma Cloud's distance scale (see Notes for Maintainers)
 
 ### Frontend Experience
 
-- Upload flow with per-file progress states
-- Chat with citation cards and follow-up prompts
+- Upload flow with per-file progress states (Upload -> Parse -> Classify -> Index -> Done)
+- Chat with citation cards, page thumbnails, and follow-up prompts
 - Document sidebar with delete, reindex, and preview actions
 - Markdown export for chat transcripts
 
@@ -239,11 +278,25 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 
 - Rate limits applied to upload and chat routes
 - File size constraints enforced during upload
-- Page image endpoint validates `doc_id` and resolved path
+- Page image endpoint validates `doc_id` and resolved path (prevents directory traversal)
+- Stored files use SHA-256 hashed filenames -- original filenames never touch the filesystem path
 - Security headers added on backend responses
 - CORS behavior controlled by environment settings
 
+**Known limitations / what's next (see Roadmap):**
+- File storage (uploads + rendered page images) is still on local disk, which is ephemeral on Render's free tier across redeploys -- planned migration to S3-compatible object storage (Cloudflare R2)
+- No user authentication yet -- all documents are in a single shared namespace
+- In-memory processing-status dict resets on restart (Postgres row remains as source of truth, but live progress percentages are lost mid-upload during a redeploy)
+
 ## Troubleshooting
+
+### Docker: "failed to connect to the docker API"
+
+Docker Desktop isn't running. Launch it from the Start Menu and wait for the tray icon to settle before running `docker-compose` commands.
+
+### Backend container restart-looping
+
+Check `docker-compose logs backend --tail 50`. The most common cause during development is a Python `IndentationError`/`TabError` from mixed tabs/spaces after a manual edit -- open the file in VS Code and run "Convert Indentation to Spaces".
 
 ### PowerShell blocks npm
 
@@ -254,71 +307,84 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-### `python-magic` missing on Windows
-
-The backend still starts. Upload validation gracefully falls back to extension and header checks when `python-magic` is unavailable.
-
 ### Frontend cannot reach backend
 
-- Ensure backend is running on `:8000`
-- Ensure `NEXT_PUBLIC_API_URL` points to the backend URL
-- Confirm CORS settings allow frontend origin
+- Ensure backend is running and reachable on the port `NEXT_PUBLIC_API_URL` points to
+- Confirm CORS (`ALLOWED_ORIGINS`) allows the frontend's origin
+- In Docker, the frontend talks to the backend via `http://localhost:8000` from the browser (not the Docker network alias), since `NEXT_PUBLIC_API_URL` is baked in at build time for the browser to use directly
 
-### Slow first startup
+### "No relevant documents found" on a real, indexed document
 
-Expected on first run because model downloads and index warmup can take time.
+Check `chunk_count` for that document via `/documents` or directly in Postgres -- if it's `0`, the document had no extractable text (commonly a scanned PDF; OCR support was removed to keep the backend within free-tier memory limits -- see Notes for Maintainers).
 
-### No relevant documents found
+### Out of memory on Render free tier
 
-The RAG system retrieves chunks by semantic similarity — not by filename. Instead of asking "What is in Report.pdf?", ask about the content directly e.g. "Summarize the financial report" or "What are the key findings in the research paper?"
+Render's free tier caps at 512MB RAM. Avoid loading heavy ML libraries (`torch`, `sentence-transformers`, `easyocr`) at import time or on startup -- load them lazily on first use, or avoid them entirely (this project uses Chroma's built-in ONNX embedding function instead of `sentence-transformers` for this reason).
 
 ## Deployment
 
-This repository currently documents local-first development. If you want hosted deployment, use one of the options below.
+This project is deployed across three platforms:
 
-### Option 1: Split deployment (recommended)
+### Backend -> Render
 
-- Deploy backend FastAPI service to a VM, container platform, or managed Python host
-- Deploy frontend Next.js app to Vercel or any Node-capable host
-- Set frontend `NEXT_PUBLIC_API_URL` to the public backend URL
-- Restrict backend CORS (`ALLOWED_ORIGINS`) to your frontend domain
+- **Root Directory:** `backend`
+- **Build Command:** `pip install -r requirements.txt`
+- **Start Command:** `uvicorn main:app --host 0.0.0.0 --port $PORT`
+- **Environment variables:** `GROQ_API_KEY`, `CHROMA_API_KEY`, `CHROMA_TENANT`, `CHROMA_DATABASE`, `ALLOWED_ORIGINS`, `DATABASE_URL` (auto-populated by linking a Render Postgres instance)
+- A separate **Render PostgreSQL** instance provides `DATABASE_URL` via its Internal Database URL
 
-### Option 2: Single-host deployment
+### Frontend -> Vercel
 
-- Run backend and frontend on the same host with a reverse proxy
-- Route `/api` to backend and frontend traffic to Next.js
-- Use process supervision (systemd, PM2, or platform equivalent)
+- **Root Directory:** `frontend`
+- **Environment variables:** `NEXT_PUBLIC_API_URL` pointing to the Render backend URL
 
-### Option 3: Containerized deployment
+### Vector store -> Chroma Cloud
 
-Docker files are not included yet, but this project is container-friendly.
-
-Suggested next steps:
-
-1. Add `backend/Dockerfile` for FastAPI + Uvicorn
-2. Add `frontend/Dockerfile` for Next.js production build
-3. Add `docker-compose.yml` for local orchestration
-4. Add `.env` and secret handling strategy for production keys
+- Free-tier hosted vector database, shared between local Docker dev and production so indexed documents persist across redeploys and across environments
 
 ### Production checklist
 
-- Use strong secret management for Groq credentials
-- Set explicit CORS origins (do not use wildcard)
-- Run behind HTTPS and a reverse proxy
-- Configure logging and error monitoring
-- Add health checks and restart policies
-- Pin dependency versions and monitor security advisories
+- [x] Secrets via environment variables (never committed)
+- [x] Explicit CORS origin handling
+- [x] Persistent vector storage (Chroma Cloud) surviving redeploys
+- [x] Persistent metadata storage (Postgres) surviving redeploys
+- [ ] Persistent file storage (currently local disk -- planned: S3/R2)
+- [ ] User authentication and per-user document scoping
+- [ ] Structured logging / error monitoring (e.g. Sentry)
+- [ ] Automated tests + CI
+
+## Roadmap
+
+This project is being actively extended beyond the original assignment scope as a learning exercise in production-grade system design:
+
+- [x] Dockerize backend + frontend, orchestrate with `docker-compose`
+- [x] Migrate vector storage from local ChromaDB to Chroma Cloud
+- [x] Migrate document metadata from JSON files to Postgres (local + Render)
+- [ ] Migrate file storage (uploads, page images) to S3-compatible object storage
+- [ ] Add authentication and per-user document scoping
+- [ ] Replace synchronous background tasks with a real job queue (Celery/Redis or `arq`)
+- [ ] Add a retrieval evaluation harness (precision/recall against a labeled Q&A set)
+- [ ] Add automated tests and CI
 
 ## Development Commands
 
-Backend:
+**Docker (recommended):**
+
+```bash
+docker-compose up --build       # build + start everything
+docker-compose down             # stop everything
+docker-compose logs backend     # tail backend logs
+docker exec -it docintel-postgres psql -U docintel -d docintel   # connect to local Postgres
+```
+
+**Backend (without Docker):**
 
 ```bash
 cd backend
 python -m uvicorn main:app --reload --port 8000
 ```
 
-Frontend:
+**Frontend (without Docker):**
 
 ```bash
 cd frontend
@@ -329,9 +395,10 @@ npm run lint
 
 ## Notes for Maintainers
 
-- `backend/main.py` performs startup warmups and sample auto-indexing.
-- `backend/routers/upload.py` handles upload security checks and background processing kickoff.
-- `backend/services/rag_agent.py` controls retrieval orchestration and final answer synthesis.
+- `backend/main.py` no longer auto-indexes sample documents or warms up the embedding model on startup -- both were removed after causing out-of-memory crashes on Render's free tier. Use `backend/create_samples.py` or the `/upload` endpoint to seed sample documents instead.
+- `backend/services/embedder.py` uses Chroma's built-in `ONNXMiniLM_L6_V2` embedding function rather than `sentence-transformers`, specifically to avoid pulling in `torch` (~1.5GB), which does not fit in Render's 512MB free-tier memory limit.
+- `RELEVANCE_THRESHOLD` in `backend/services/rag_agent.py` was empirically retuned after migrating to Chroma Cloud + `chromadb==1.5.9`, since the cosine-distance scale shifted compared to the original local ChromaDB 0.5.x setup. If retrieval quality seems off after a ChromaDB version bump, check this value against real logged distances before assuming a code bug.
+- `backend/routers/upload.py` and `backend/routers/documents.py` are fully migrated to Postgres via `services/document_repo.py`. `backend/create_samples.py` still writes to the legacy JSON metadata format -- it is a standalone seeding script, not part of the live request path, so this inconsistency is tracked but not urgent.
 - `frontend/lib/api.ts` is the central API client used by UI components.
 
 ## License
