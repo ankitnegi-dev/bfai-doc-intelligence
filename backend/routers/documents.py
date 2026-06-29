@@ -1,21 +1,23 @@
 """
 Documents Router
 ----------------
-GET /documents              - List all indexed documents
+GET /documents              - List documents (own + public if logged in, else public only)
 GET /page-image              - Serve a rendered page PNG
-GET /documents/{id}          - Get metadata for one document
-DELETE /documents/{id}       - Remove a document
-POST /documents/{id}/reindex - Re-process and re-index a document
+GET /documents/{id}          - Get metadata for one document (owner or public only)
+DELETE /documents/{id}       - Remove a document (owner only)
+POST /documents/{id}/reindex - Re-process and re-index a document (owner only)
 """
 import logging
 import asyncio
 from pathlib import Path
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
 from fastapi.responses import FileResponse, Response
 
 from services.document_repo import get_document, list_documents, upsert_document
 from services import object_storage
+from services.auth_deps import get_current_user_optional, get_current_user_required
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -32,10 +34,23 @@ def _valid_doc_id(doc_id: str) -> bool:
     return len(doc_id) == 64 and all(c in "0123456789abcdef" for c in doc_id)
 
 
+def _can_access(doc: dict, current_user: Optional[dict]) -> bool:
+    """A document is accessible if it's public (user_id is None) or owned by current_user."""
+    owner_id = doc.get("user_id")
+    if owner_id is None:
+        return True
+    return current_user is not None and current_user["id"] == owner_id
+
+
 @router.get("/documents")
-async def get_all_documents():
-    """Return all indexed documents with their metadata and classifications."""
-    docs = list_documents()
+async def get_all_documents(current_user: Optional[dict] = Depends(get_current_user_optional)):
+    """
+    Return documents visible to the caller.
+    Logged-in users see their own documents plus public/demo documents.
+    Anonymous users see only public/demo documents.
+    """
+    user_id = current_user["id"] if current_user else None
+    docs = list_documents(user_id=user_id)
     return {
         "documents": docs,
         "total": len([d for d in docs if d.get("status") == "indexed"])
@@ -43,31 +58,43 @@ async def get_all_documents():
 
 
 @router.get("/documents/{doc_id}")
-async def get_one_document(doc_id: str):
-    """Get metadata for a specific document."""
+async def get_one_document(
+    doc_id: str,
+    current_user: Optional[dict] = Depends(get_current_user_optional),
+):
+    """Get metadata for a specific document. Must be public or owned by the caller."""
     if not _valid_doc_id(doc_id):
         raise HTTPException(status_code=400, detail="Invalid document ID")
 
     doc = get_document(doc_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    if not _can_access(doc, current_user):
+        raise HTTPException(status_code=404, detail="Document not found")
+
     return doc
 
 
 @router.get("/page-image")
 async def get_page_image(
     doc_id: str = Query(..., description="Document ID (SHA-256 hash)"),
-    page: int = Query(..., ge=1, le=1000, description="Page number")
+    page: int = Query(..., ge=1, le=1000, description="Page number"),
+    current_user: Optional[dict] = Depends(get_current_user_optional),
 ):
     """
     Serve a rendered page PNG.
     Images are ONLY served through this endpoint - never from direct disk path.
     Tries object storage (B2) first, falls back to local disk for any files
     that were processed before the object-storage migration.
-    Validates doc_id to prevent path traversal.
+    Validates doc_id to prevent path traversal, and checks ownership.
     """
     if not _valid_doc_id(doc_id):
         raise HTTPException(status_code=400, detail="Invalid document ID")
+
+    doc = get_document(doc_id)
+    if doc is None or not _can_access(doc, current_user):
+        raise HTTPException(status_code=404, detail="Page image not found")
 
     key = f"{PAGES_PREFIX}{doc_id}_{page}.png"
 
@@ -111,10 +138,21 @@ async def get_page_image(
 
 
 @router.delete("/documents/{doc_id}")
-async def delete_document(doc_id: str):
-    """Remove a document and all its associated data (vectors, Postgres row, files)."""
+async def delete_document(
+    doc_id: str,
+    current_user: dict = Depends(get_current_user_required),
+):
+    """Remove a document and all its associated data. Requires login and ownership."""
     if not _valid_doc_id(doc_id):
         raise HTTPException(status_code=400, detail="Invalid document ID")
+
+    doc = get_document(doc_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    owner_id = doc.get("user_id")
+    if owner_id is not None and owner_id != current_user["id"]:
+        raise HTTPException(status_code=403, detail="You do not have permission to delete this document")
 
     from services.vector_store import delete_document as vs_delete
     from models.db import get_session, Document
@@ -125,9 +163,9 @@ async def delete_document(doc_id: str):
     # Remove from Postgres
     session = get_session()
     try:
-        doc = session.get(Document, doc_id)
-        if doc:
-            session.delete(doc)
+        db_doc = session.get(Document, doc_id)
+        if db_doc:
+            session.delete(db_doc)
             session.commit()
     finally:
         session.close()
@@ -149,9 +187,13 @@ async def delete_document(doc_id: str):
 
 
 @router.post("/documents/{doc_id}/reindex")
-async def reindex_document(doc_id: str, background_tasks: BackgroundTasks):
+async def reindex_document(
+    doc_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user_required),
+):
     """
-    Re-process and re-index an existing document.
+    Re-process and re-index an existing document. Requires login and ownership.
     Downloads the original file from object storage (or local disk fallback),
     deletes old vectors, and runs the full parse -> classify -> embed -> persist
     pipeline again in the background.
@@ -163,8 +205,13 @@ async def reindex_document(doc_id: str, background_tasks: BackgroundTasks):
     if meta is None:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    owner_id = meta.get("user_id")
+    if owner_id is not None and owner_id != current_user["id"]:
+        raise HTTPException(status_code=403, detail="You do not have permission to reindex this document")
+
     original_filename = meta.get("original_filename", "unknown")
     file_ext = meta.get("file_ext") or Path(original_filename).suffix.lower() or ".pdf"
+    existing_user_id = owner_id  # preserve original ownership through reindex
 
     # Locate the original file: object storage first, then local disk fallback
     file_path = UPLOADS_DIR / f"{doc_id}{file_ext}"
@@ -230,6 +277,7 @@ async def reindex_document(doc_id: str, background_tasks: BackgroundTasks):
                 classification=classification,
                 chunk_count=chunk_count,
                 error_message=error_msg,
+                user_id=existing_user_id,
             )
             logger.info(f"Reindex complete: {original_filename} ({chunk_count} chunks)")
 
@@ -242,6 +290,7 @@ async def reindex_document(doc_id: str, background_tasks: BackgroundTasks):
                 file_size=file_path.stat().st_size if file_path.exists() else 0,
                 status="error",
                 error_message=str(e),
+                user_id=existing_user_id,
             )
 
     background_tasks.add_task(_do_reindex)
