@@ -10,6 +10,35 @@ const api = axios.create({
   timeout: 300000  // 5 minutes instead of 2
 })
 
+// ─── Auth token handling ──────────────────────────────────────────────────────
+
+const TOKEN_KEY = 'docintel_token'
+
+export const getStoredToken = (): string | null => {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+export const setStoredToken = (token: string): void => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(TOKEN_KEY, token)
+}
+
+export const clearStoredToken = (): void => {
+  if (typeof window === 'undefined') return
+  localStorage.removeItem(TOKEN_KEY)
+}
+
+// Attach the token to every request automatically, if present
+api.interceptors.request.use((config) => {
+  const token = getStoredToken()
+  if (token) {
+    config.headers = config.headers ?? {}
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface ChatMessage {
@@ -77,6 +106,17 @@ export interface DocumentMetadata {
   status: string
 }
 
+export interface User {
+  id: string
+  email: string
+}
+
+export interface AuthResponse {
+  access_token: string
+  token_type: string
+  user: User
+}
+
 // ─── API Functions ────────────────────────────────────────────────────────────
 
 /**
@@ -106,12 +146,16 @@ export const streamChatMessage = (
 
   const run = async () => {
     try {
-      const response = await fetch(`${API_URL}/chat/stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, history }),
-        signal: controller.signal,
-      })
+      const token = getStoredToken()
+const response = await fetch(`${API_URL}/chat/stream`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  },
+  body: JSON.stringify({ query, history }),
+  signal: controller.signal,
+})
 
       if (!response.ok || !response.body) {
         onError(`Request failed: ${response.status}`)
@@ -232,6 +276,47 @@ export const getDocumentById = async (docId: string): Promise<DocumentMetadata> 
 export const healthCheck = async (): Promise<{ status: string; indexed_chunks: number; api_configured: boolean }> => {
   const response = await api.get('/health')
   return response.data
+}
+
+/**
+ * Register a new user account. Stores the returned token automatically.
+ */
+export const registerUser = async (email: string, password: string): Promise<AuthResponse> => {
+  const response = await api.post<AuthResponse>('/auth/register', { email, password })
+  setStoredToken(response.data.access_token)
+  return response.data
+}
+
+/**
+ * Log in an existing user. Stores the returned token automatically.
+ */
+export const loginUser = async (email: string, password: string): Promise<AuthResponse> => {
+  const response = await api.post<AuthResponse>('/auth/login', { email, password })
+  setStoredToken(response.data.access_token)
+  return response.data
+}
+
+/**
+ * Get the currently logged-in user's info. Returns null if not logged in
+ * or the token is invalid/expired.
+ */
+export const getCurrentUser = async (): Promise<User | null> => {
+  const token = getStoredToken()
+  if (!token) return null
+  try {
+    const response = await api.get<User>('/auth/me')
+    return response.data
+  } catch {
+    clearStoredToken()
+    return null
+  }
+}
+
+/**
+ * Log out: clear the stored token.
+ */
+export const logoutUser = (): void => {
+  clearStoredToken()
 }
 
 export default api
