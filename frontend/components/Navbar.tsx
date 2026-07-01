@@ -1,15 +1,18 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { getDocuments } from '@/lib/api'
-import { FileText, Upload, Brain, Database, Sun, Moon } from 'lucide-react'
+import { FileText, Upload, Brain, Database, Sun, Moon, LogOut, User as UserIcon } from 'lucide-react'
 import { useTheme } from './ThemeProvider'
+import { useAuth } from '@/context/AuthContext'
 
 export default function Navbar() {
   const pathname  = usePathname()
+  const router = useRouter()
   const [docCount, setDocCount] = useState<number>(0)
   const { theme, toggle } = useTheme()
+  const { user, logout, isLoading } = useAuth()
 
   useEffect(() => {
     const fetchCount = async () => {
@@ -23,7 +26,12 @@ export default function Navbar() {
     fetchCount()
     const interval = setInterval(fetchCount, 10000)
     return () => clearInterval(interval)
-  }, [])
+  }, [user])
+
+  const handleLogout = () => {
+    logout()
+    router.push('/chat')
+  }
 
   const navLinks = [
     { href: '/chat', label: 'Chat', icon: Brain },
@@ -68,6 +76,33 @@ export default function Navbar() {
               <Database className="w-3 h-3" />
               <span>{docCount} doc{docCount !== 1 ? 's' : ''}</span>
             </div>
+
+            {/* Auth state */}
+            {!isLoading && (
+              user ? (
+                <div className="flex items-center gap-2 ml-2">
+                  <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs text-slate-600 dark:text-slate-300">
+                    <UserIcon className="w-3 h-3" />
+                    <span className="max-w-[140px] truncate">{user.email}</span>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-red-600 dark:hover:text-red-400 transition-all"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span className="hidden sm:inline">Logout</span>
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  href="/login"
+                  className="ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white transition-all"
+                >
+                  <UserIcon className="w-4 h-4" />
+                  Login
+                </Link>
+              )
+            )}
 
             {/* Dark mode toggle */}
             <button
