@@ -17,6 +17,20 @@ services:
       retries: 5
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: docintel-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -28,8 +42,33 @@ services:
       - ./backend/.env
     environment:
       DATABASE_URL: postgresql://docintel:docintel_local_pw@postgres:5432/docintel
+      REDIS_URL: redis://redis:6379
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - backend_storage:/app/storage
+      - onnx_cache:/root/.cache
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: docintel-worker
+    command: arq worker.WorkerSettings
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://docintel:docintel_local_pw@postgres:5432/docintel
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - ./backend:/app
@@ -54,3 +93,4 @@ volumes:
   backend_storage:
   postgres_data:
   onnx_cache:
+  redis_data:
